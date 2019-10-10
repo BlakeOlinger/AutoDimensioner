@@ -19,6 +19,11 @@ namespace AutoDimension
 
             drawing.InsertModelAnnotations3((int)swImportModelItemsSource_e.swImportModelItemsFromEntireModel, 163840, true, true, true, false);
 
+            // TODO - make this program open blob.L2_cover.SLDASM -> write '0' to the "Is Dimensioned" field
+            // of blob.L2_cover.txt -> build the cover assembly to suppress the items -> open the drawing document in SW
+            // -> call this program's drawing.InsertModelAnnotations3() -> switch active docs to the assembly ->
+            // write '1' to the "Is Dimensioned" field of blob.L2_cover.txt -> save and close that document ->
+            // continue with the autoDrawing tasks from other programs
         }
     }
 }

@@ -1,5 +1,7 @@
 ﻿using SldWorks;
 using SwConst;
+using System;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace AutoDimension
@@ -9,76 +11,144 @@ namespace AutoDimension
         static void Main(string[] args)
         {
             var swInstance = new SldWorks.SldWorks();
-            
-            // open blob.L2_cover.SLDASM
-            var coverAssemblyPath = @"C:\Users\bolinger\Documents\SolidWorks Projects\Prefab Blob - Cover Blob\blob - L2\blob.L2_cover.SLDASM";
-            var model = (ModelDoc2)swInstance.OpenDoc(coverAssemblyPath, (int)swDocumentTypes_e.swDocASSEMBLY);
 
-            // wait for document to open
-            Thread.Sleep(4_000);
+            // read from app data to populate the 3 expected paths
+            // currently: cover assembly, cover assembly config, cover drawing paths
+            var appDataPath = @"C:\Users\bolinger\Documents\SolidWorks Projects\Prefab Blob - Cover Blob\app data\rebuild.txt";
+            var appDataLines = System.IO.File.ReadAllLines(appDataPath);
 
-            // initial on-open rebuild - top level only: false
-            model.ForceRebuild3(false);
-            
+            // make blob.L2_cover.SLDASM the active SW document
+            var coverAssemblyFileName = getFileNameFromPath(appDataLines[0]);
+            var errors = 0;
+            var model = (ModelDoc2)swInstance.ActivateDoc3(coverAssemblyFileName, true,
+                (int)swRebuildOnActivation_e.swRebuildActiveDoc, ref errors);
+
             // write to blob.L2_cover.txt '0' to the field "Is Dimensioned"
-            var coverConfigPath = @"C:\Users\bolinger\Documents\SolidWorks Projects\Prefab Blob - Cover Blob\blob - L2\blob.L2_cover.txt";
+            var coverConfigPath = appDataLines[1];
             var coverConfigLines = System.IO.File.ReadAllLines(coverConfigPath);
-            var isDimensionedLine = coverConfigLines[30];
-            var replacedLine = isDimensionedLine.Replace("1", "0");
-            coverConfigLines[30] = replacedLine;
+            var index = 0;
+            var stop = false;
+            while (!stop)
+            {
+                var line = coverConfigLines[index];
+
+                if (line.Contains("Is Dimensioned") &&
+                    !line.Contains("IIF"))
+                {
+                    stop = true;
+                    var newLine = coverConfigLines[index].Replace("1", "0");
+
+                    coverConfigLines[index] = newLine;
+                } else
+                {
+                    ++index;
+                }
+            }
             System.IO.File.WriteAllLines(coverConfigPath, coverConfigLines);
 
             // wait for write
-            Thread.Sleep(1_000);
-            
-            // rebuild to reflect cover config write
+            var delay = 300;
+            Thread.Sleep(delay);
+
+            // rebuild to suppress assembly features
             model.ForceRebuild3(false);
+
+            // wait a second
+            Thread.Sleep(delay);
+
+            // make blob.cover.SLDDRW the active SW document
+            var coverDrawingFileName = getFileNameFromPath(appDataLines[2]);
+            model = (ModelDoc2)swInstance.ActivateDoc3(coverDrawingFileName, true,
+                (int)swRebuildOnActivation_e.swRebuildActiveDoc, ref errors);
             
-            // wait for a few seconds
-            Thread.Sleep(2_000);
+            // wait a second
+            Thread.Sleep(delay);
 
-            // open drawing
-            var coverDrawingPath = @"C:\Users\bolinger\Documents\SolidWorks Projects\Prefab Blob - Cover Blob\base blob - L1\blob.cover.SLDDRW";
-            var drawingDocument = (ModelDoc2)swInstance.OpenDoc(coverDrawingPath, (int)swDocumentTypes_e.swDocDRAWING);
-
-            // wait a few seconds
-            Thread.Sleep(3_000);
-
-            // draw dimensions
-            model = (ModelDoc2)swInstance.ActiveDoc;
+            // draw dimensions - requires dimensions to be at the cover assembly level
+            // - and marked for drawing
             var drawing = (DrawingDoc)model;
-            drawing.InsertModelAnnotations3((int)swImportModelItemsSource_e.swImportModelItemsFromEntireModel, 163840, true, true, true, false);
+            var annotations = (object[])drawing.InsertModelAnnotations3(
+                (int)swImportModelItemsSource_e.swImportModelItemsFromEntireModel,
+                (int)swInsertAnnotation_e.swInsertDimensionsMarkedForDrawing,
+                true, false, false, false);
 
-            // wait a few seconds
-            Thread.Sleep(2_000);
-
-            // switch to assembly document
-            var frame = (Frame)swInstance.Frame();
-            var windows = (object[])frame.ModelWindows;
-            var assemblyWindow = (ModelWindow)windows[1];
-            frame.ShowModelWindow(assemblyWindow);
+            // wait a second
+            Thread.Sleep(delay);
             
+            // make blob.L2_cover.SLDASM the active SW document
+            model = (ModelDoc2)swInstance.ActivateDoc3(coverAssemblyFileName, true,
+                (int)swRebuildOnActivation_e.swRebuildActiveDoc, ref errors);
+
             // write unsuppress to assembly config
-            coverConfigLines = System.IO.File.ReadAllLines(coverConfigPath);
-            isDimensionedLine = coverConfigLines[30];
-            replacedLine = isDimensionedLine.Replace("0", "1");
-            coverConfigLines[30] = replacedLine;
+            coverConfigLines[index] = coverConfigLines[index].Replace("0", "1");
             System.IO.File.WriteAllLines(coverConfigPath, coverConfigLines);
+            
+            // wait a second
+            Thread.Sleep(delay);
 
-            // wait a few seconds
-            Thread.Sleep(2_000);
-
-            // rebuild to unsuppress assembly - necessary to unsuppress open drawing
-            model = (ModelDoc2)swInstance.ActiveDoc;
-            model.ForceRebuild3(false);
-            Thread.Sleep(2_000);
+            // rebuild assembly - necessary to unsuppress drawing
             model.ForceRebuild3(false);
 
-            // wait a few seconds
-            Thread.Sleep(2_000);
+            // wait a second
+            Thread.Sleep(delay);
 
-            // close assembly file
-            swInstance.CloseDoc(coverAssemblyPath);
+            // final rebuild
+            model.ForceRebuild3(false);
+
+            // wait a second
+            Thread.Sleep(delay);
+
+            // make blob.cover.SLDDRW the active SW document
+            model = (ModelDoc2)swInstance.ActivateDoc3(coverDrawingFileName, true,
+                (int)swRebuildOnActivation_e.swRebuildActiveDoc, ref errors);
+        }
+        private static void waitForInput()
+        {
+            displayLines(" ... Press Any Key to Continue.");
+            Console.ReadLine();
+            Console.Clear();
+        }
+        private static string getFileNameFromPath(string path)
+        {
+            var pathSegments = path.Split('\\');
+            return pathSegments[pathSegments.Length - 1].Trim();
+        }
+        private static void displayLines(string[] lines)
+        {
+            foreach (string line in lines)
+            {
+                Console.WriteLine(line);
+            }
+        }
+        private static void displayLines(string line)
+        {
+            Console.WriteLine(line);
+        }
+        private static void displayLines(int line)
+        {
+            Console.WriteLine(line);
+        }
+        private static void displayLines(double line)
+        {
+            Console.WriteLine(line);
+        }
+        private static void displayLines(double[] lines)
+        {
+            foreach (double number in lines)
+            {
+                Console.WriteLine(number);
+            }
+        }
+        private static void displayLines(Dictionary<string, string> dict)
+        {
+            foreach (string property in dict.Keys)
+            {
+                Console.WriteLine(property + " : " + dict[property]);
+            }
+        }
+        private static void displayLines(Boolean line)
+        {
+            Console.WriteLine(line);
         }
     }
 }

@@ -64,12 +64,11 @@ namespace AutoDimension
             // wait a second
             Thread.Sleep(delay);
 
-            // draw dimensions - requires dimensions to be at the cover assembly level
-            // - and marked for drawing
+            // draw annotations to drawing doc
             var drawing = (DrawingDoc)model;
             var annotations = (object[])drawing.InsertModelAnnotations3(
                 (int)swImportModelItemsSource_e.swImportModelItemsFromEntireModel,
-                (int)swInsertAnnotation_e.swInsertDimensionsMarkedForDrawing,
+                33280, // dimensions marked for drawing, insert axes
                 true, false, false, false);
 
             // wait a second

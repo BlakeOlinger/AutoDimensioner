@@ -63,23 +63,59 @@ namespace AutoDimension
             
             // wait a second
             Thread.Sleep(delay);
-
+            
             // draw annotations to drawing doc
             var drawing = (DrawingDoc)model;
             var annotations = (object[])drawing.InsertModelAnnotations3(
                 (int)swImportModelItemsSource_e.swImportModelItemsFromEntireModel,
-                33280, // dimensions marked for drawing, insert axes
-                true, false, true, false);
+                (int)swInsertAnnotation_e.swInsertDimensionsMarkedForDrawing,
+                true, false, false, false);
+
+            // second dimension - hidden doesn't work
+            Thread.Sleep(delay);
+            model = (ModelDoc2)swInstance.ActivateDoc3(coverAssemblyFileName, true,
+              (int)swRebuildOnActivation_e.swRebuildActiveDoc, ref errors);
+            var index2 = 0;
+            stop = false;
+            while (!stop)
+            {
+                var line = coverConfigLines[index2];
+
+                if (line.Contains("Is Dimensioned 2") &&
+                    !line.Contains("IIF"))
+                {
+                    stop = true;
+                    var newLine = coverConfigLines[index2].Replace("1", "0");
+
+                    coverConfigLines[index2] = newLine;
+                }
+                else
+                {
+                    ++index2;
+                }
+            }
+            System.IO.File.WriteAllLines(coverConfigPath, coverConfigLines);
+            Thread.Sleep(delay);
+            model.ForceRebuild3(false);
+            Thread.Sleep(delay);
+            swInstance.ActivateDoc3(coverDrawingFileName, true,
+                (int)swRebuildOnActivation_e.swRebuildActiveDoc, ref errors);
+            Thread.Sleep(delay);
+            drawing.InsertModelAnnotations3(
+                (int)swImportModelItemsSource_e.swImportModelItemsFromEntireModel,
+                (int)swInsertAnnotation_e.swInsertDimensionsMarkedForDrawing,
+                true, false, false, false);
 
             // wait a second
             Thread.Sleep(delay);
             
             // make blob.L2_cover.SLDASM the active SW document
             model = (ModelDoc2)swInstance.ActivateDoc3(coverAssemblyFileName, true,
-                (int)swRebuildOnActivation_e.swRebuildActiveDoc, ref errors);
+              (int)swRebuildOnActivation_e.swRebuildActiveDoc, ref errors);
 
             // write unsuppress to assembly config
             coverConfigLines[index] = coverConfigLines[index].Replace("0", "1");
+            coverConfigLines[index2] = coverConfigLines[index2].Replace("0", "1");
             System.IO.File.WriteAllLines(coverConfigPath, coverConfigLines);
             
             // wait a second

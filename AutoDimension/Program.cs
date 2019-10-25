@@ -69,7 +69,7 @@ namespace AutoDimension
             var annotations = (object[])drawing.InsertModelAnnotations3(
                 (int)swImportModelItemsSource_e.swImportModelItemsFromEntireModel,
                 33280, // dimensions marked for drawing, insert axes
-                true, false, false, false);
+                true, false, true, false);
 
             // wait a second
             Thread.Sleep(delay);
